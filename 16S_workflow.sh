@@ -13,29 +13,43 @@ mkdir $2/fasta
 #### Deziper les fastq
 gunzip $1/*.gz
 
+######## PARTIE 1 ########
 
-
-#### Reportez les distributions de qualités avant et après filtrage qualité à l’aide de fastqc
+#### Reportez les distributions de qualités avant filtrage qualité à l’aide de fastqc
 fastqc $1/*_R1.fastq $1/*_R2.fastq -o $2/fastqc_avanttrim
 
 for i in $list_fastq; do
     fastqc -o $2/fastqc_avanttrim --noextract fastq/$i
 done
 
+
+#### Executer le script d'Alientrimmer
+cd soft
+./JarMaker.sh AlienTrimmer.java
+cd ..
+
+
 for file in $(ls $1/*_R1.fastq)
 do
 	nameR1="$file"
+	out_nameR1=$(echo $nameR1 | cut -d/ -f 2 | cut -d. -f 1)
+	
 	nameR2=$(echo $file | sed "s/R1/R2/g")
+	out_nameR2=$(echo $nameR2 | cut -d/ -f 2 | cut -d. -f 1)
+	
+	singleton=$(echo $i | sed 's/R1//g')
+	out_singleton=$(echo $nameR3 | cut -d/ -f 2 | cut -d. -f 1)
+	
 	samplename=$(echo $file | cut -d/ -f 2 | cut -d_ -f 1)
 	
 	## Trimmer les reads appariés à l’aide d’Alientrimmer
-	java -jar soft/AlienTrimmer.jar -if $nameR1 -ir $nameR2 -or $2/trimmed/$name_R1 -of $2/trimmed/$name_R2 -c databases/contaminants.fasta -q 20
+	java -jar soft/AlienTrimmer.jar -if $nameR1 -ir $nameR2 -c databases/contaminants.fasta -q 20 -of $2/trimmed/$out_nameR1.at.fq -or $2/trimmed/$out_nameR2.at.fq -os $2/trimmed/$out_singleton.at.sgl.fq
 	
-	## fastqc
-	fastqc $2/trimmed/*_R1.fastq.at.fq $2/trimmed/*_R2.fastq.at.fq -o $2/fastqc_aprestrim
+	## Reportez les distributions de qualités après filtrage qualité à l’aide de fastqc
+	fastqc $2/trimmed/$out_nameR1.at.fq $2/trimmed/$out_nameR2.at.fq -o $2/fastqc_aprestrim
 	
 	## Fusionner les reads à l’aide Vsearch > Pairer les séquence F et R > Merger
-	vsearch --fastq_mergepairs $2/trimmed/*_R1.fastq.at.fq --reverse $2/trimmed/*_R2.fastq.at.fq --fastaout $2/fasta/$samplename.fasta --label_suffix "$s;sample=$samplename;" --fastq_minovlen 40 --fastq_maxdiffs 15
+	vsearch --fastq_mergepairs $2/trimmed/$out_nameR1.at.fq --reverse $2/trimmed/$out_nameR2.at.fq --fastaout $2/fasta/$samplename.fasta --label_suffix "$s;sample=$samplename;" --fastq_minovlen 40 --fastq_maxdiffs 15
 done
 
 
@@ -44,6 +58,8 @@ done
 cat $2/fasta/*.fasta > $2/fasta/amplicon.fasta
 sed -i -e "s/ //g" $2/fasta/amplicon.fasta
 
+
+######## PARTIE 2 ########
 
 #### Deduplication
 
@@ -61,6 +77,8 @@ soft/vsearch --uchime_denovo $2/fasta/amplicon_derep_fl.fasta --nonchimeras $2/f
 #### clustering
 soft/vsearch --cluster_size $2/fasta/amplicon_non_chimeras.fasta --id 0.97 --sizein --sizeout --relabel OTU_ --centroids $2/fasta/OTU.fasta
 
+
+######## PARTIE 3 ########
 
 ### Déterminer l'abondance des OTUs
 soft/vsearch -usearch_global $2/fasta/amplicon.fasta --otutabout $2/fasta/OTU  -db $2/fasta/amplicon_dedfluchim_OTU.fasta --id 0.97
