@@ -28,7 +28,7 @@ cd soft
 ./JarMaker.sh AlienTrimmer.java
 cd ..
 
-
+#### Réaliser les commandes de la partie 1
 for file in $(ls $1/*_R1.fastq)
 do
 	nameR1="$file"
@@ -87,5 +87,7 @@ soft/vsearch -usearch_global $2/fasta/amplicon.fasta --otutabout $2/fasta/OTU  -
 #### Annoter les OTU contre l’ensemble de 16S/18S fournis par le constructeur
 soft/vsearch --usearch_global $2/fasta/OTU.fasta --userout  $2/fasta/annotations.fasta --db databases/mock_16S_18S.fasta  --id 0.9 --top_hits_only --userfields query+target
 
+
+#### Ajouter un intitulé à ce fichier
 sed '1iOTU\tAnnotation' -i $2/fasta/annotations.fasta
 
